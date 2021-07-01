@@ -5,30 +5,34 @@ using RouteNetworkSearchIndexer.Config;
 using Microsoft.Extensions.Logging;
 using OpenFTTH.Events.RouteNetwork;
 using DAX.EventProcessing.Dispatcher;
+using MediatR;
 
 namespace RouteNetworkSearchIndexer.RouteNetwork
 {
-    internal class RouteNetworkConsumer : IRouteNetworkConsumer
+    public class RouteNetworkConsumer : IRouteNetworkConsumer
     {
         private IDisposable _consumer;
         private readonly KafkaSetting _kafkaSetting;
         private readonly ILogger<RouteNetworkConsumer> _logger;
         private readonly IToposTypedEventMediator<RouteNetworkEditOperationOccuredEvent> _eventMediator;
+        private readonly IMediator _mediator;
 
         public RouteNetworkConsumer(
             IOptions<KafkaSetting> kafkaSetting,
             ILogger<RouteNetworkConsumer> logger,
-            IToposTypedEventMediator<RouteNetworkEditOperationOccuredEvent> eventMediator)
+            IToposTypedEventMediator<RouteNetworkEditOperationOccuredEvent> eventMediator,
+            IMediator mediator)
         {
             _kafkaSetting = kafkaSetting.Value;
             _logger = logger;
             _eventMediator = eventMediator;
+            _mediator = mediator;
         }
 
         public void Consume()
         {
             _consumer = _eventMediator
-                .Config(_kafkaSetting.Consumer + Guid.NewGuid(), c =>
+                .Config(_kafkaSetting.Consumer, c =>
                 {
                     c.UseKafka(_kafkaSetting.Server);
                 })
@@ -42,7 +46,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                         if (message.Body is RouteNetworkEditOperationOccuredEvent)
                         {
                             var editEvent = message.Body as RouteNetworkEditOperationOccuredEvent;
-                            _logger.LogInformation("Id is " + editEvent.EventId);
+                            await _mediator.Send(editEvent);
                         }
                     }
                 })

@@ -1,6 +1,6 @@
 namespace RouteNetworkSearchIndexer.Config
 {
-    internal class KafkaSetting
+    public class KafkaSetting
     {
         public string Consumer { get; set; }
         public string Server { get; set; }

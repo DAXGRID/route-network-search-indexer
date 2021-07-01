@@ -2,7 +2,7 @@ using System;
 
 namespace RouteNetworkSearchIndexer.RouteNetwork
 {
-    internal interface IRouteNetworkConsumer : IDisposable
+    public interface IRouteNetworkConsumer : IDisposable
     {
         void Consume();
     }

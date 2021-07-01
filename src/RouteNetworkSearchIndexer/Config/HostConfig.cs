@@ -60,7 +60,6 @@ namespace RouteNetworkSearchIndexer.Config
                 services.AddTransient<IRouteNetworkConsumer, RouteNetworkConsumer>();
                 services.Configure<KafkaSetting>(kafkaSettings =>
                                                  hostContext.Configuration.GetSection("kafka").Bind(kafkaSettings));
-
             });
         }
 

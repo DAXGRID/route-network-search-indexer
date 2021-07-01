@@ -7,7 +7,7 @@ using RouteNetworkSearchIndexer.RouteNetwork;
 
 namespace RouteNetworkSearchIndexer
 {
-    internal class RouteNetworkSearchIndexerHost : IHostedService
+    public class RouteNetworkSearchIndexerHost : IHostedService
     {
         private readonly ILogger<RouteNetworkSearchIndexerHost> _logger;
         private readonly IHostApplicationLifetime _applicationLifetime;
