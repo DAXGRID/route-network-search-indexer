@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using RouteNetworkSearchIndexer.RouteNetwork;
 
 namespace RouteNetworkSearchIndexer
 {
@@ -10,12 +11,16 @@ namespace RouteNetworkSearchIndexer
     {
         private readonly ILogger<RouteNetworkSearchIndexerHost> _logger;
         private readonly IHostApplicationLifetime _applicationLifetime;
+        private readonly IRouteNetworkConsumer _routeNetworkConsumer;
 
-        public RouteNetworkSearchIndexerHost(ILogger<RouteNetworkSearchIndexerHost> logger,
-        IHostApplicationLifetime hostApplicationLifetime)
+        public RouteNetworkSearchIndexerHost(
+            ILogger<RouteNetworkSearchIndexerHost> logger,
+            IHostApplicationLifetime hostApplicationLifetime,
+            IRouteNetworkConsumer routeNetworkConsumer = null)
         {
             _logger = logger;
             _applicationLifetime = hostApplicationLifetime;
+            _routeNetworkConsumer = routeNetworkConsumer;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -43,10 +48,12 @@ namespace RouteNetworkSearchIndexer
         private void OnStarted()
         {
             _logger.LogInformation("Starting to consume RouteNodeEvents");
+            _routeNetworkConsumer.Consume();
         }
 
         private void OnStopped()
         {
+            _routeNetworkConsumer.Dispose();
             _logger.LogInformation("Stopped");
         }
     }

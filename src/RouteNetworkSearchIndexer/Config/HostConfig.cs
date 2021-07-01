@@ -1,6 +1,15 @@
+using System.Reflection;
+using DAX.EventProcessing.Dispatcher;
+using DAX.EventProcessing.Dispatcher.Topos;
+using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
+using OpenFTTH.Events.RouteNetwork;
+using RouteNetworkSearchIndexer.RouteNetwork;
 using Serilog;
 using Serilog.Formatting.Compact;
 
@@ -15,6 +24,7 @@ namespace RouteNetworkSearchIndexer.Config
             ConfigureApp(hostBuilder);
             ConfigureLogging(hostBuilder);
             ConfigureServices(hostBuilder);
+            ConfigureSerialization(hostBuilder);
 
             return hostBuilder.Build();
         }
@@ -27,12 +37,31 @@ namespace RouteNetworkSearchIndexer.Config
             });
         }
 
+        private static void ConfigureSerialization(IHostBuilder hostBuilder)
+        {
+            JsonConvert.DefaultSettings = (() =>
+               {
+                   var settings = new JsonSerializerSettings();
+                   settings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+                   settings.Converters.Add(new StringEnumConverter());
+                   settings.TypeNameHandling = TypeNameHandling.Auto;
+                   return settings;
+               });
+        }
+
         private static void ConfigureServices(IHostBuilder hostBuilder)
         {
             hostBuilder.ConfigureServices((hostContext, services) =>
             {
                 services.AddOptions();
+                services.AddMediatR(typeof(RouteNetworkConsumer));
+                services.AddTransient<IToposTypedEventMediator<RouteNetworkEditOperationOccuredEvent>,
+                    ToposTypedEventMediator<RouteNetworkEditOperationOccuredEvent>>();
                 services.AddHostedService<RouteNetworkSearchIndexerHost>();
+                services.AddTransient<IRouteNetworkConsumer, RouteNetworkConsumer>();
+                services.Configure<KafkaSetting>(kafkaSettings =>
+                                                 hostContext.Configuration.GetSection("kafka").Bind(kafkaSettings));
+
             });
         }
 

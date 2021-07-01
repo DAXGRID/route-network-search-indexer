@@ -356,5 +356,5 @@ MigrationBackup/
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
 
-# So we dont commit appsettings
-appsettings.json
+# So we dont commit .env
+.env
