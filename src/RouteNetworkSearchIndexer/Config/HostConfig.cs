@@ -1,4 +1,3 @@
-using System.Reflection;
 using DAX.EventProcessing.Dispatcher;
 using DAX.EventProcessing.Dispatcher.Topos;
 using MediatR;
@@ -54,7 +53,7 @@ namespace RouteNetworkSearchIndexer.Config
             hostBuilder.ConfigureServices((hostContext, services) =>
             {
                 services.AddOptions();
-                services.AddMediatR(typeof(RouteNetworkConsumer));
+                services.AddMediatR(typeof(Program));
                 services.AddTransient<IToposTypedEventMediator<RouteNetworkEditOperationOccuredEvent>,
                     ToposTypedEventMediator<RouteNetworkEditOperationOccuredEvent>>();
                 services.AddHostedService<RouteNetworkSearchIndexerHost>();
