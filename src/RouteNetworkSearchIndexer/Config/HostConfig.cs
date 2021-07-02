@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using DAX.EventProcessing.Dispatcher;
 using DAX.EventProcessing.Dispatcher.Topos;
 using MediatR;
@@ -10,7 +12,10 @@ using Newtonsoft.Json.Serialization;
 using OpenFTTH.Events.RouteNetwork;
 using RouteNetworkSearchIndexer.RouteNetwork;
 using Serilog;
+using Serilog.Events;
 using Serilog.Formatting.Compact;
+using Typesense;
+using Typesense.Setup;
 
 namespace RouteNetworkSearchIndexer.Config
 {
@@ -58,6 +63,19 @@ namespace RouteNetworkSearchIndexer.Config
                     ToposTypedEventMediator<RouteNetworkEditOperationOccuredEvent>>();
                 services.AddHostedService<RouteNetworkSearchIndexerHost>();
                 services.AddTransient<IRouteNetworkConsumer, RouteNetworkConsumer>();
+                services.AddTypesenseClient(c =>
+                {
+                    c.ApiKey = "";
+                    c.Nodes = new List<Node>
+                    {
+                        new Node
+                        {
+                            Host = "",
+                            Port = "80",
+                            Protocol = "http",
+                        }
+                    };
+                });
                 services.Configure<KafkaSetting>(kafkaSettings =>
                                                  hostContext.Configuration.GetSection("kafka").Bind(kafkaSettings));
             });
@@ -74,6 +92,8 @@ namespace RouteNetworkSearchIndexer.Config
                 {
                     var logger = new LoggerConfiguration()
                         .ReadFrom.Configuration(loggingConfiguration)
+                        .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                        .MinimumLevel.Override("System", LogEventLevel.Warning)
                         .Enrich.FromLogContext()
                         .WriteTo.Console(new CompactJsonFormatter())
                         .CreateLogger();

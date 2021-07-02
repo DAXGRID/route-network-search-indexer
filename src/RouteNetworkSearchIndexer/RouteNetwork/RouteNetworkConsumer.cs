@@ -55,7 +55,10 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
 
         public void Dispose()
         {
-            _consumer.Dispose();
+            if (_consumer is not null)
+            {
+                _consumer.Dispose();
+            }
         }
     }
 }
