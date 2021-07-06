@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using DAX.EventProcessing.Dispatcher;
-using DAX.EventProcessing.Dispatcher.Topos;
 using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,7 +7,6 @@ using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
-using OpenFTTH.Events.RouteNetwork;
 using RouteNetworkSearchIndexer.RouteNetwork;
 using Serilog;
 using Serilog.Events;
@@ -59,20 +56,18 @@ namespace RouteNetworkSearchIndexer.Config
             {
                 services.AddOptions();
                 services.AddMediatR(typeof(Program));
-                services.AddTransient<IToposTypedEventMediator<RouteNetworkEditOperationOccuredEvent>,
-                    ToposTypedEventMediator<RouteNetworkEditOperationOccuredEvent>>();
                 services.AddHostedService<RouteNetworkSearchIndexerHost>();
                 services.AddTransient<IRouteNetworkConsumer, RouteNetworkConsumer>();
                 services.AddTypesenseClient(c =>
                 {
-                    c.ApiKey = "";
+                    c.ApiKey = Environment.GetEnvironmentVariable("TYPESENSE__APIKEY");
                     c.Nodes = new List<Node>
                     {
                         new Node
                         {
-                            Host = "",
-                            Port = "80",
-                            Protocol = "http",
+                            Host = Environment.GetEnvironmentVariable("TYPESENSE__HOST"),
+                            Port = Environment.GetEnvironmentVariable("TYPESENSE__PORT"),
+                            Protocol = Environment.GetEnvironmentVariable("TYPESENSE__PROTOCOL"),
                         }
                     };
                 });

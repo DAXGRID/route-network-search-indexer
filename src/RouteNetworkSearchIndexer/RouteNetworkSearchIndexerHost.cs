@@ -62,9 +62,7 @@ namespace RouteNetworkSearchIndexer
         private void OnStopped()
         {
             if (_routeNetworkConsumer is not null)
-            {
                 _routeNetworkConsumer.Dispose();
-            }
             _logger.LogInformation("Stopped");
         }
 

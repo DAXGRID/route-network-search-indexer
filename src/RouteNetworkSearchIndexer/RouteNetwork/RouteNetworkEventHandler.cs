@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using OpenFTTH.Events.RouteNetwork;
 using Typesense;
 using OpenFTTH.Events.Core;
+using System;
 
 namespace RouteNetworkSearchIndexer.RouteNetwork
 {
@@ -13,6 +14,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
     {
         private readonly ILogger<RouteNetworkEventHandler> _logger;
         private readonly ITypesenseClient _typesense;
+        private const string RouteNodeCollectionName = "RouteNodes";
 
         public RouteNetworkEventHandler(ILogger<RouteNetworkEventHandler> logger, ITypesenseClient typesense)
         {
@@ -20,24 +22,35 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
             _typesense = typesense;
         }
 
-        public async Task<Unit> Handle(RouteNetworkEditOperationOccuredEvent request, CancellationToken cancellationToken)
+        public async Task<Unit> Handle(
+            RouteNetworkEditOperationOccuredEvent request,
+            CancellationToken cancellationToken)
         {
-            _logger.LogInformation("Received message");
             foreach (var command in request.RouteNetworkCommands)
             {
                 foreach (var routeNetworkEvent in command?.RouteNetworkEvents)
                 {
-                    switch (routeNetworkEvent)
+                    try
                     {
-                        // case RouteNodeAdded domainEvent:
-                        //     await HandleRouteNodeAdded(domainEvent);
-                        //     break;
-                        // case RouteNodeMarkedForDeletion domainEvent:
-                        //     await HandleRouteNodeMarkedForDeletion(domainEvent);
-                        //     break;
-                        // case NamingInfoModified domainEvent:
-                        //     await HandleNamingInfoModified(domainEvent);
-                        //     break;
+                        switch (routeNetworkEvent)
+                        {
+                            case RouteNodeAdded domainEvent:
+                                await HandleRouteNodeAdded(domainEvent);
+                                break;
+                            case RouteNodeMarkedForDeletion domainEvent:
+                                await HandleRouteNodeMarkedForDeletion(domainEvent);
+                                break;
+                            case NamingInfoModified domainEvent:
+                                await HandleNamingInfoModified(domainEvent);
+                                break;
+                            case RouteNodeGeometryModified domainEvent:
+                                await HandleRouteNodeGeometryModified(domainEvent);
+                                break;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e.Message);
                     }
                 }
             }
@@ -47,7 +60,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
 
         private async Task HandleRouteNodeAdded(RouteNodeAdded routeNodeAdded)
         {
-            _logger.LogInformation(nameof(HandleRouteNodeAdded));
+            _logger.LogDebug(nameof(HandleRouteNodeAdded));
 
             if (!string.IsNullOrWhiteSpace(routeNodeAdded?.NamingInfo?.Name))
             {
@@ -64,13 +77,14 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
 
         private async Task HandleRouteNodeMarkedForDeletion(RouteNodeMarkedForDeletion routeNodeMarkedForDeletion)
         {
-            _logger.LogInformation(nameof(HandleRouteNodeMarkedForDeletion));
-            await _typesense.DeleteDocument<TypesenseRouteNode>("RouteNodes", routeNodeMarkedForDeletion.NodeId.ToString());
+            _logger.LogDebug(nameof(HandleRouteNodeMarkedForDeletion));
+            await _typesense.DeleteDocument<TypesenseRouteNode>(
+                "RouteNodes", routeNodeMarkedForDeletion.NodeId.ToString());
         }
 
         private async Task HandleNamingInfoModified(NamingInfoModified namingInfoModified)
         {
-            _logger.LogInformation(nameof(HandleNamingInfoModified));
+            _logger.LogDebug(nameof(HandleNamingInfoModified));
             if (namingInfoModified.AggregateType.ToLower() != "routenode")
                 return;
 
@@ -96,6 +110,29 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                         EastCoordinate = result.EastCoordinate,
                     });
                 }
+            }
+        }
+
+        private async Task HandleRouteNodeGeometryModified(RouteNodeGeometryModified routeNodeGeometryModified)
+        {
+            _logger.LogDebug(nameof(HandleRouteNodeGeometryModified));
+
+            var result = await _typesense.RetrieveDocument<TypesenseRouteNode>(
+                RouteNodeCollectionName, routeNodeGeometryModified.NodeId.ToString());
+
+            if (result is not null)
+            {
+                var geometry = JsonConvert.DeserializeObject<string[]>(routeNodeGeometryModified.Geometry);
+                await _typesense.UpdateDocument<TypesenseRouteNode>(
+                    RouteNodeCollectionName,
+                    routeNodeGeometryModified.EventId.ToString(),
+                    new TypesenseRouteNode
+                    {
+                        Id = routeNodeGeometryModified.EventId.ToString(),
+                        NorthCoordinate = geometry[0],
+                        EastCoordinate = geometry[1],
+                        Name = result.Name
+                    });
             }
         }
     }
