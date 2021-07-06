@@ -13,15 +13,18 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
     {
         private IDisposable _consumer;
         private readonly KafkaSetting _kafkaSetting;
+        private readonly PostgresqlSetting _postgresSetting;
         private readonly ILogger<RouteNetworkConsumer> _logger;
         private readonly IMediator _mediator;
 
         public RouteNetworkConsumer(
             IOptions<KafkaSetting> kafkaSetting,
+            IOptions<PostgresqlSetting> postgresSetting,
             ILogger<RouteNetworkConsumer> logger,
             IMediator mediator)
         {
             _kafkaSetting = kafkaSetting.Value;
+            _postgresSetting = postgresSetting.Value;
             _logger = logger;
             _mediator = mediator;
         }
@@ -31,7 +34,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
             _consumer = Configure
                 .Consumer(_kafkaSetting.Consumer, c => c.UseKafka(_kafkaSetting.Server))
                 .Logging(l => l.UseSerilog())
-                .Positions(x => x.StoreInMemory())
+                .Positions(x => x.StoreInPostgreSql(_postgresSetting.ConnectionString, _kafkaSetting.Consumer))
                 .Serialization(x => x.GenericEventDeserializer<RouteNetworkEditOperationOccuredEvent>())
                 .Topics(x => x.Subscribe(_kafkaSetting.Topic))
                 .Options(x => x.SetMinimumBatchSize(1))
