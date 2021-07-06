@@ -11,7 +11,6 @@ using RouteNetworkSearchIndexer.RouteNetwork;
 using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Compact;
-using Typesense;
 using Typesense.Setup;
 
 namespace RouteNetworkSearchIndexer.Config
@@ -71,8 +70,8 @@ namespace RouteNetworkSearchIndexer.Config
                         }
                     };
                 });
-                services.Configure<KafkaSetting>(kafkaSettings =>
-                                                 hostContext.Configuration.GetSection("kafka").Bind(kafkaSettings));
+                services.Configure<KafkaSetting>(s => hostContext.Configuration.GetSection("kafka").Bind(s));
+                services.Configure<PostgresqlSetting>(s => hostContext.Configuration.GetSection("postgresql").Bind(s));
             });
         }
 
