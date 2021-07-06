@@ -71,7 +71,6 @@ namespace RouteNetworkSearchIndexer.Config
                     };
                 });
                 services.Configure<KafkaSetting>(s => hostContext.Configuration.GetSection("kafka").Bind(s));
-                services.Configure<PostgresqlSetting>(s => hostContext.Configuration.GetSection("postgresql").Bind(s));
             });
         }
 
