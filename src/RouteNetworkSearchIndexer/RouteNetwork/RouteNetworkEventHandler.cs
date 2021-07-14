@@ -43,9 +43,6 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                             case NamingInfoModified domainEvent:
                                 await HandleNamingInfoModified(domainEvent);
                                 break;
-                            case RouteNodeGeometryModified domainEvent:
-                                await HandleRouteNodeGeometryModified(domainEvent);
-                                break;
                         }
                     }
                     catch (Exception e)
@@ -68,23 +65,16 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                 {
                     Id = routeNodeAdded.NodeId.ToString(),
                     Name = routeNodeAdded.NamingInfo.Name.Trim(),
-                    NorthCoordinate = geometry[0],
-                    EastCoordinate = geometry[1]
                 });
             }
         }
 
         private async Task HandleRouteNodeMarkedForDeletion(RouteNodeMarkedForDeletion routeNodeMarkedForDeletion)
         {
-            var result = await _typesense
-                .RetrieveDocument<TypesenseRouteNode>("RouteNodes", routeNodeMarkedForDeletion.NodeId.ToString());
-
-            if (result is not null)
-            {
-                _logger.LogInformation($"{nameof(HandleRouteNodeMarkedForDeletion)}, NodeId: '{result.Id}'");
-                await _typesense.DeleteDocument<TypesenseRouteNode>(
-                    "RouteNodes", routeNodeMarkedForDeletion.NodeId.ToString());
-            }
+            _logger.LogInformation(
+                $"{nameof(HandleRouteNodeMarkedForDeletion)}, NodeId: '{routeNodeMarkedForDeletion.NodeId}'");
+            await _typesense.DeleteDocument<TypesenseRouteNode>(
+                "RouteNodes", routeNodeMarkedForDeletion.NodeId.ToString());
         }
 
         private async Task HandleNamingInfoModified(NamingInfoModified namingInfoModified)
@@ -92,54 +82,26 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
             if (namingInfoModified.AggregateType.ToLower() != "routenode")
                 return;
 
-            var result = await _typesense
-                .RetrieveDocument<TypesenseRouteNode>("RouteNodes", namingInfoModified.AggregateId.ToString());
-
-            if (result is not null)
+            if (!string.IsNullOrWhiteSpace(namingInfoModified.NamingInfo.Name))
             {
-                if (string.IsNullOrWhiteSpace(namingInfoModified?.NamingInfo?.Name))
+                _logger.LogInformation(
+                    $"{nameof(HandleNamingInfoModified)}, NodeId: '{namingInfoModified.AggregateId}'");
+                await _typesense.UpsertDocument<TypesenseRouteNode>("RouteNodes", new TypesenseRouteNode
                 {
-                    _logger.LogInformation
-                        ($"{nameof(HandleNamingInfoModified)}, NodeId: '{result.Id}' deletes since name was removed");
-
-                    // we delete it because the name has been removed so it should no longer be searchable
-                    await _typesense.DeleteDocument<TypesenseRouteNode>(
-                        "RouteNodes",
-                        namingInfoModified.AggregateId.ToString());
-                }
-                else
-                {
-                    _logger.LogInformation($"{nameof(HandleNamingInfoModified)}, NodeId: '{result.Id}'");
-                    await _typesense.UpsertDocument<TypesenseRouteNode>("RouteNodes", new TypesenseRouteNode
-                    {
-                        Id = namingInfoModified.AggregateId.ToString(),
-                        Name = namingInfoModified.NamingInfo.Name.Trim(),
-                        NorthCoordinate = result.NorthCoordinate,
-                        EastCoordinate = result.EastCoordinate,
-                    });
-                }
+                    Id = namingInfoModified.AggregateId.ToString(),
+                    Name = namingInfoModified.NamingInfo.Name.Trim(),
+                });
             }
-        }
-
-        private async Task HandleRouteNodeGeometryModified(RouteNodeGeometryModified routeNodeGeometryModified)
-        {
-            var result = await _typesense.RetrieveDocument<TypesenseRouteNode>(
-                RouteNodeCollectionName, routeNodeGeometryModified.NodeId.ToString());
-
-            if (result is not null)
+            else
             {
-                _logger.LogInformation($"{nameof(HandleRouteNodeGeometryModified)}, NodeId: '{result.Id}'");
-                var geometry = JsonConvert.DeserializeObject<string[]>(routeNodeGeometryModified.Geometry);
-                await _typesense.UpdateDocument<TypesenseRouteNode>(
-                    RouteNodeCollectionName,
-                    routeNodeGeometryModified.EventId.ToString(),
-                    new TypesenseRouteNode
-                    {
-                        Id = routeNodeGeometryModified.EventId.ToString(),
-                        NorthCoordinate = geometry[0],
-                        EastCoordinate = geometry[1],
-                        Name = result.Name
-                    });
+                _logger.LogInformation(
+                    $"{nameof(HandleNamingInfoModified)}, NodeId: '{namingInfoModified.AggregateId}' deletes if exists");
+
+                // we delete it because the name has been removed so it should no longer be searchable
+                // when name is empty
+                await _typesense.DeleteDocument<TypesenseRouteNode>(
+                    "RouteNodes",
+                    namingInfoModified.AggregateId.ToString());
             }
         }
     }
