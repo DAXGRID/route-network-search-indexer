@@ -1,3 +1,10 @@
+version: 2.1
+
+executors:
+  dotnet-core-sdk:
+    docker:
+    - image: mcr.microsoft.com/dotnet/sdk:5.0.300-buster-slim
+      auth:
         username: $DOCKER_LOGIN
         password: $DOCKER_ACCESSTOKEN
   docker-publisher:
@@ -65,7 +72,6 @@ jobs:
            docker tag $IMAGE_NAME:latest $IMAGE_NAME:$IMAGE_TAG
            docker push $IMAGE_NAME:latest
            docker push $IMAGE_NAME:$IMAGE_TAG
-
   update-helm-chart:
     executor: alpine-git
     steps:
@@ -91,7 +97,6 @@ jobs:
              git add .
              git commit -m "upgrades $IMAGE_NAME to version $CIRCLE_TAG"
              git push
-
 workflows:
   build-test-upload_image:
     jobs:
