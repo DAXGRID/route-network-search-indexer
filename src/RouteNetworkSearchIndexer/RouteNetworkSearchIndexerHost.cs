@@ -31,12 +31,10 @@ namespace RouteNetworkSearchIndexer
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation($"Starting {nameof(RouteNetworkSearchIndexerHost)}");
+            _logger.LogInformation($"Starting {nameof(RouteNetworkSearchIndexerHost)}.");
 
             _applicationLifetime.ApplicationStarted.Register(OnStarted);
             _applicationLifetime.ApplicationStopping.Register(OnStopped);
-
-            MarkAsReady();
 
             return Task.CompletedTask;
         }
@@ -46,17 +44,19 @@ namespace RouteNetworkSearchIndexer
             return Task.CompletedTask;
         }
 
+        private void OnStarted()
+        {
+            _logger.LogInformation("Checking Typesense collections.");
+            CreateNodeCollectionTypesense().Wait();
+            _logger.LogInformation("Starting to consume RouteNodeEvents.");
+            _routeNetworkConsumer.Consume();
+            _logger.LogInformation("Marked as healthy.");
+            MarkAsReady();
+        }
+
         private void MarkAsReady()
         {
             File.Create("/tmp/healthy");
-        }
-
-        private void OnStarted()
-        {
-            _logger.LogInformation("Checking Typesense collections");
-            CreateNodeCollectionTypesense().Wait();
-            _logger.LogInformation("Starting to consume RouteNodeEvents");
-            _routeNetworkConsumer.Consume();
         }
 
         private void OnStopped()
@@ -82,7 +82,7 @@ namespace RouteNetworkSearchIndexer
                     },
                 };
 
-                _logger.LogInformation("Creating Typesense collection 'RouteNodes'");
+                _logger.LogInformation("Creating Typesense collection 'RouteNodes'.");
                 await _typesense.CreateCollection(schema);
             }
         }
