@@ -1,11 +1,11 @@
-using System;
-using Topos.Config;
-using Microsoft.Extensions.Options;
-using RouteNetworkSearchIndexer.Config;
-using Microsoft.Extensions.Logging;
-using OpenFTTH.Events.RouteNetwork;
 using DAX.EventProcessing.Serialization;
 using MediatR;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using OpenFTTH.Events.RouteNetwork;
+using RouteNetworkSearchIndexer.Config;
+using System;
+using Topos.Config;
 
 namespace RouteNetworkSearchIndexer.RouteNetwork
 {
@@ -42,7 +42,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                         switch (message.Body)
                         {
                             case RouteNetworkEditOperationOccuredEvent domainEvent:
-                                await _mediator.Send(domainEvent);
+                                await _mediator.Send(domainEvent).ConfigureAwait(false);
                                 break;
                         }
                     }

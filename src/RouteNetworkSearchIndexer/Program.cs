@@ -1,7 +1,7 @@
-﻿using System.IO;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using RouteNetworkSearchIndexer.Config;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace RouteNetworkSearchIndexer
 {
@@ -13,11 +13,9 @@ namespace RouteNetworkSearchIndexer
             var dotenv = Path.Combine(root, ".env");
             DotEnv.Load(dotenv);
 
-            using (var host = HostConfig.Configure())
-            {
-                await host.StartAsync();
-                await host.WaitForShutdownAsync();
-            }
+            using var host = HostConfig.Configure();
+            await host.StartAsync().ConfigureAwait(false);
+            await host.WaitForShutdownAsync().ConfigureAwait(false);
         }
     }
 }
