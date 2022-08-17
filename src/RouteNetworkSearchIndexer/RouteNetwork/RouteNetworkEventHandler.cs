@@ -1,12 +1,13 @@
-using System.Threading;
-using System.Threading.Tasks;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using OpenFTTH.Events.RouteNetwork;
-using Typesense;
 using OpenFTTH.Events.Core;
+using OpenFTTH.Events.RouteNetwork;
+using RouteNetworkSearchIndexer.Config;
 using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Typesense;
 
 namespace RouteNetworkSearchIndexer.RouteNetwork
 {
@@ -14,7 +15,6 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
     {
         private readonly ILogger<RouteNetworkEventHandler> _logger;
         private readonly ITypesenseClient _typesense;
-        private const string RouteNodeCollectionName = "RouteNodes";
 
         public RouteNetworkEventHandler(ILogger<RouteNetworkEventHandler> logger, ITypesenseClient typesense)
         {
@@ -60,8 +60,10 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
             if (!string.IsNullOrWhiteSpace(routeNodeAdded?.NamingInfo?.Name))
             {
                 _logger.LogInformation($"{nameof(HandleRouteNodeAdded)}, NodeId: '{routeNodeAdded.NodeId}'");
+
                 var geometry = JsonConvert.DeserializeObject<string[]>(routeNodeAdded.Geometry);
-                await _typesense.CreateDocument<TypesenseRouteNode>("RouteNodes", new TypesenseRouteNode
+
+                await _typesense.CreateDocument<TypesenseRouteNode>(TypesenseCollectionConfig.Name, new TypesenseRouteNode
                 {
                     Id = routeNodeAdded.NodeId.ToString(),
                     Name = routeNodeAdded.NamingInfo.Name.Trim(),
@@ -73,8 +75,10 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
         {
             _logger.LogInformation(
                 $"{nameof(HandleRouteNodeMarkedForDeletion)}, NodeId: '{routeNodeMarkedForDeletion.NodeId}'");
+
             await _typesense.DeleteDocument<TypesenseRouteNode>(
-                "RouteNodes", routeNodeMarkedForDeletion.NodeId.ToString());
+                TypesenseCollectionConfig.Name,
+                routeNodeMarkedForDeletion.NodeId.ToString());
         }
 
         private async Task HandleNamingInfoModified(NamingInfoModified namingInfoModified)
@@ -86,7 +90,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
             {
                 _logger.LogInformation(
                     $"{nameof(HandleNamingInfoModified)}, NodeId: '{namingInfoModified.AggregateId}'");
-                await _typesense.UpsertDocument<TypesenseRouteNode>("RouteNodes", new TypesenseRouteNode
+                await _typesense.UpsertDocument<TypesenseRouteNode>(TypesenseCollectionConfig.Name, new TypesenseRouteNode
                 {
                     Id = namingInfoModified.AggregateId.ToString(),
                     Name = namingInfoModified.NamingInfo.Name.Trim(),
@@ -100,7 +104,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                 // we delete it because the name has been removed so it should no longer be searchable
                 // when name is empty
                 await _typesense.DeleteDocument<TypesenseRouteNode>(
-                    "RouteNodes",
+                    TypesenseCollectionConfig.Name,
                     namingInfoModified.AggregateId.ToString());
             }
         }
