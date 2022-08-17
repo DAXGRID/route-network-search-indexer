@@ -1,11 +1,12 @@
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using RouteNetworkSearchIndexer.Config;
+using RouteNetworkSearchIndexer.RouteNetwork;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using RouteNetworkSearchIndexer.RouteNetwork;
 using Typesense;
 
 namespace RouteNetworkSearchIndexer
@@ -48,8 +49,10 @@ namespace RouteNetworkSearchIndexer
         {
             _logger.LogInformation("Checking Typesense collections.");
             CreateNodeCollectionTypesense().Wait();
+
             _logger.LogInformation("Starting to consume RouteNodeEvents.");
             _routeNetworkConsumer.Consume();
+
             _logger.LogInformation("Marked as healthy.");
             MarkAsReady();
         }
@@ -63,26 +66,31 @@ namespace RouteNetworkSearchIndexer
         {
             if (_routeNetworkConsumer is not null)
                 _routeNetworkConsumer.Dispose();
+
             _logger.LogInformation("Stopped");
         }
 
         private async Task CreateNodeCollectionTypesense()
         {
             var collections = await _typesense.RetrieveCollections();
-            var collection = collections.FirstOrDefault(x => x.Name == "RouteNodes");
+            var collection = collections
+                .FirstOrDefault(x => x.Name == TypesenseCollectionConfig.Name);
 
             if (collection is null)
             {
                 var schema = new Schema
                 {
-                    Name = "RouteNodes",
+                    Name = TypesenseCollectionConfig.Name,
                     Fields = new List<Field>
                     {
-                        new Field("name", "string", false),
+                        new Field("name", FieldType.String, false, true),
                     },
                 };
 
-                _logger.LogInformation("Creating Typesense collection 'RouteNodes'.");
+                _logger.LogInformation(
+                    "Creating Typesense collection '{CollectionName}'.",
+                    TypesenseCollectionConfig.Name);
+
                 await _typesense.CreateCollection(schema);
             }
         }
