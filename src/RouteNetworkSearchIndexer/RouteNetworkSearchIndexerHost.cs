@@ -11,7 +11,7 @@ using Typesense;
 
 namespace RouteNetworkSearchIndexer
 {
-    public class RouteNetworkSearchIndexerHost : IHostedService
+    public class RouteNetworkSearchIndexerHost : BackgroundService
     {
         private readonly ILogger<RouteNetworkSearchIndexerHost> _logger;
         private readonly IHostApplicationLifetime _applicationLifetime;
@@ -30,49 +30,23 @@ namespace RouteNetworkSearchIndexer
             _typesense = typesense;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation($"Starting {nameof(RouteNetworkSearchIndexerHost)}.");
 
-            _applicationLifetime.ApplicationStarted.Register(OnStarted);
-            _applicationLifetime.ApplicationStopping.Register(OnStopped);
-
-            return Task.CompletedTask;
-        }
-
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        private void OnStarted()
-        {
             _logger.LogInformation("Checking Typesense collections.");
-            CreateNodeCollectionTypesense().Wait();
+            await CreateNodeCollectionTypesense().ConfigureAwait(false);
 
             _logger.LogInformation("Starting to consume RouteNodeEvents.");
             _routeNetworkConsumer.Consume();
 
             _logger.LogInformation("Marked as healthy.");
-            MarkAsReady();
-        }
-
-        private void MarkAsReady()
-        {
             File.Create("/tmp/healthy");
-        }
-
-        private void OnStopped()
-        {
-            if (_routeNetworkConsumer is not null)
-                _routeNetworkConsumer.Dispose();
-
-            _logger.LogInformation("Stopped");
         }
 
         private async Task CreateNodeCollectionTypesense()
         {
-            var collections = await _typesense.RetrieveCollections();
+            var collections = await _typesense.RetrieveCollections().ConfigureAwait(false);
             var collection = collections
                 .FirstOrDefault(x => x.Name == TypesenseCollectionConfig.Name);
 
@@ -91,8 +65,16 @@ namespace RouteNetworkSearchIndexer
                     "Creating Typesense collection '{CollectionName}'.",
                     TypesenseCollectionConfig.Name);
 
-                await _typesense.CreateCollection(schema);
+                await _typesense.CreateCollection(schema).ConfigureAwait(false);
             }
+        }
+
+        public override void Dispose()
+        {
+            if (_routeNetworkConsumer is not null)
+                _routeNetworkConsumer.Dispose();
+
+            _logger.LogInformation("Stopped.");
         }
     }
 }

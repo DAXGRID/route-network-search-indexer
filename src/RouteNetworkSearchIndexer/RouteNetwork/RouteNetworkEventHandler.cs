@@ -35,13 +35,16 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                         switch (routeNetworkEvent)
                         {
                             case RouteNodeAdded domainEvent:
-                                await HandleRouteNodeAdded(domainEvent);
+                                await HandleRouteNodeAdded(domainEvent)
+                                    .ConfigureAwait(false);
                                 break;
                             case RouteNodeMarkedForDeletion domainEvent:
-                                await HandleRouteNodeMarkedForDeletion(domainEvent);
+                                await HandleRouteNodeMarkedForDeletion(domainEvent)
+                                    .ConfigureAwait(false);
                                 break;
                             case NamingInfoModified domainEvent:
-                                await HandleNamingInfoModified(domainEvent);
+                                await HandleNamingInfoModified(domainEvent)
+                                    .ConfigureAwait(false);
                                 break;
                         }
                     }
@@ -67,7 +70,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                 {
                     Id = routeNodeAdded.NodeId.ToString(),
                     Name = routeNodeAdded.NamingInfo.Name.Trim(),
-                });
+                }).ConfigureAwait(false);
             }
         }
 
@@ -78,7 +81,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
 
             await _typesense.DeleteDocument<TypesenseRouteNode>(
                 TypesenseCollectionConfig.Name,
-                routeNodeMarkedForDeletion.NodeId.ToString());
+                routeNodeMarkedForDeletion.NodeId.ToString()).ConfigureAwait(false);
         }
 
         private async Task HandleNamingInfoModified(NamingInfoModified namingInfoModified)
@@ -94,7 +97,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                 {
                     Id = namingInfoModified.AggregateId.ToString(),
                     Name = namingInfoModified.NamingInfo.Name.Trim(),
-                });
+                }).ConfigureAwait(false);
             }
             else
             {
@@ -105,7 +108,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                 // when name is empty
                 await _typesense.DeleteDocument<TypesenseRouteNode>(
                     TypesenseCollectionConfig.Name,
-                    namingInfoModified.AggregateId.ToString());
+                    namingInfoModified.AggregateId.ToString()).ConfigureAwait(false);
             }
         }
     }
