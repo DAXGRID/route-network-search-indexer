@@ -11,7 +11,8 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
 {
     public class RouteNetworkConsumer : IRouteNetworkConsumer
     {
-        private IDisposable _consumer;
+        private DateTime? _lastMessageReceived = null;
+        private IDisposable? _consumer;
         private readonly KafkaSetting _kafkaSetting;
         private readonly ILogger<RouteNetworkConsumer> _logger;
         private readonly IMediator _mediator;
@@ -29,12 +30,11 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
         public void Consume()
         {
             _consumer = Configure
-                .Consumer(_kafkaSetting.Consumer, c => c.UseKafka(_kafkaSetting.Server))
+                .Consumer($"{_kafkaSetting.Consumer}-{Guid.NewGuid()}", c => c.UseKafka(_kafkaSetting.Server))
                 .Logging(l => l.UseSerilog())
-                .Positions(x => x.StoreInPostgreSql(_kafkaSetting.PositionConnectionString, _kafkaSetting.Consumer))
+                .Positions(x => x.StoreInMemory())
                 .Serialization(x => x.GenericEventDeserializer<RouteNetworkEditOperationOccuredEvent>())
                 .Topics(x => x.Subscribe(_kafkaSetting.Topic))
-                .Options(x => x.SetMinimumBatchSize(1))
                 .Handle(async (messages, context, token) =>
                 {
                     foreach (var message in messages)
@@ -42,12 +42,17 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
                         switch (message.Body)
                         {
                             case RouteNetworkEditOperationOccuredEvent domainEvent:
+                                _lastMessageReceived = DateTime.UtcNow;
                                 await _mediator.Send(domainEvent).ConfigureAwait(false);
                                 break;
                         }
                     }
-                })
-                .Start();
+                }).Start();
+        }
+
+        public DateTime? LastMessageReceived()
+        {
+            return _lastMessageReceived;
         }
 
         public void Dispose()

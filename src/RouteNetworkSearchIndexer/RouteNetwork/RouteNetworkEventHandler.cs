@@ -28,7 +28,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
         {
             foreach (var command in request.RouteNetworkCommands)
             {
-                foreach (var routeNetworkEvent in command?.RouteNetworkEvents)
+                foreach (var routeNetworkEvent in command.RouteNetworkEvents)
                 {
                     try
                     {
@@ -66,7 +66,7 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
 
                 var geometry = JsonConvert.DeserializeObject<string[]>(routeNodeAdded.Geometry);
 
-                await _typesense.CreateDocument<TypesenseRouteNode>(TypesenseCollectionConfig.Name, new TypesenseRouteNode
+                await _typesense.CreateDocument<TypesenseRouteNode>(TypesenseCollectionConfig.CollectionName, new TypesenseRouteNode
                 {
                     Id = routeNodeAdded.NodeId.ToString(),
                     Name = routeNodeAdded.NamingInfo.Name.Trim(),
@@ -76,12 +76,20 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
 
         private async Task HandleRouteNodeMarkedForDeletion(RouteNodeMarkedForDeletion routeNodeMarkedForDeletion)
         {
-            _logger.LogInformation(
-                $"{nameof(HandleRouteNodeMarkedForDeletion)}, NodeId: '{routeNodeMarkedForDeletion.NodeId}'");
+            try
+            {
+                await _typesense.DeleteDocument<TypesenseRouteNode>(
+                    TypesenseCollectionConfig.CollectionName,
+                    routeNodeMarkedForDeletion.NodeId.ToString()).ConfigureAwait(false);
 
-            await _typesense.DeleteDocument<TypesenseRouteNode>(
-                TypesenseCollectionConfig.Name,
-                routeNodeMarkedForDeletion.NodeId.ToString()).ConfigureAwait(false);
+                _logger.LogInformation(
+                    $"{nameof(HandleRouteNodeMarkedForDeletion)}, NodeId: '{routeNodeMarkedForDeletion.NodeId}'");
+
+            }
+            catch (TypesenseApiNotFoundException)
+            {
+                // This is valid.
+            }
         }
 
         private async Task HandleNamingInfoModified(NamingInfoModified namingInfoModified)
@@ -89,11 +97,11 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
             if (namingInfoModified.AggregateType.ToLower() != "routenode")
                 return;
 
-            if (!string.IsNullOrWhiteSpace(namingInfoModified.NamingInfo.Name))
+            if (!string.IsNullOrWhiteSpace(namingInfoModified.NamingInfo?.Name))
             {
                 _logger.LogInformation(
                     $"{nameof(HandleNamingInfoModified)}, NodeId: '{namingInfoModified.AggregateId}'");
-                await _typesense.UpsertDocument<TypesenseRouteNode>(TypesenseCollectionConfig.Name, new TypesenseRouteNode
+                await _typesense.UpsertDocument<TypesenseRouteNode>(TypesenseCollectionConfig.CollectionName, new TypesenseRouteNode
                 {
                     Id = namingInfoModified.AggregateId.ToString(),
                     Name = namingInfoModified.NamingInfo.Name.Trim(),
@@ -101,14 +109,21 @@ namespace RouteNetworkSearchIndexer.RouteNetwork
             }
             else
             {
-                _logger.LogInformation(
-                    $"{nameof(HandleNamingInfoModified)}, NodeId: '{namingInfoModified.AggregateId}' deletes if exists");
+                try
+                {
+                    // we delete it because the name has been removed so it should no longer be searchable
+                    // when name is empty
+                    await _typesense.DeleteDocument<TypesenseRouteNode>(
+                        TypesenseCollectionConfig.CollectionName,
+                        namingInfoModified.AggregateId.ToString()).ConfigureAwait(false);
 
-                // we delete it because the name has been removed so it should no longer be searchable
-                // when name is empty
-                await _typesense.DeleteDocument<TypesenseRouteNode>(
-                    TypesenseCollectionConfig.Name,
-                    namingInfoModified.AggregateId.ToString()).ConfigureAwait(false);
+                    _logger.LogInformation(
+                        $"{nameof(HandleNamingInfoModified)}, NodeId: '{namingInfoModified.AggregateId}' deleted.");
+                }
+                catch (TypesenseApiNotFoundException)
+                {
+                    // This is valid.
+                }
             }
         }
     }
