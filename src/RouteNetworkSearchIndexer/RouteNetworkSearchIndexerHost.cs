@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RouteNetworkSearchIndexer.Config;
 using RouteNetworkSearchIndexer.RouteNetwork;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -34,39 +35,86 @@ namespace RouteNetworkSearchIndexer
         {
             _logger.LogInformation($"Starting {nameof(RouteNetworkSearchIndexerHost)}.");
 
-            _logger.LogInformation("Checking Typesense collections.");
-            await CreateNodeCollectionTypesense().ConfigureAwait(false);
+            // We migrate when first time run.
+            await MigratePreviousCollection().ConfigureAwait(false);
+
+            await SetupCollection().ConfigureAwait(false);
 
             _logger.LogInformation("Starting to consume RouteNodeEvents.");
             _routeNetworkConsumer.Consume();
 
-            _logger.LogInformation("Marked as healthy.");
+            // This is a hack, it will be removed when solution is using event-store instead.
+            var lastReceivedTimeSec = 15;
+            while (true)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(lastReceivedTimeSec), stoppingToken).ConfigureAwait(false);
+
+                var lastMessageReceived = _routeNetworkConsumer.LastMessageReceived();
+                if (lastMessageReceived is not null &&
+                    lastMessageReceived.Value.AddSeconds(lastReceivedTimeSec) < DateTime.UtcNow)
+                {
+                    break;
+                }
+            }
+
+            _logger.LogInformation(
+                "Upserting {CollectionAlias} to {CollectionName}.",
+                TypesenseCollectionConfig.AliasName,
+                TypesenseCollectionConfig.CollectionName);
+
+            await _typesense.UpsertCollectionAlias(
+                TypesenseCollectionConfig.AliasName,
+                new CollectionAlias(TypesenseCollectionConfig.CollectionName)).ConfigureAwait(false);
+
+            var collections = await RetrieveMatchingCollectionNames(
+                $"{TypesenseCollectionConfig.AliasName}-").ConfigureAwait(false);
+
+            foreach (var collectionName in collections.Where(x => x != TypesenseCollectionConfig.CollectionName))
+            {
+                _logger.LogInformation("Deleting {Collection}.", collectionName);
+                await _typesense.DeleteCollection(collectionName).ConfigureAwait(false);
+            }
+
             File.Create("/tmp/healthy");
+            _logger.LogInformation("Marked as healthy.");
         }
 
-        private async Task CreateNodeCollectionTypesense()
+        private async Task MigratePreviousCollection()
         {
-            var collections = await _typesense.RetrieveCollections().ConfigureAwait(false);
-            var collection = collections
-                .FirstOrDefault(x => x.Name == TypesenseCollectionConfig.Name);
-
-            if (collection is null)
+            try
             {
-                var schema = new Schema
-                {
-                    Name = TypesenseCollectionConfig.Name,
-                    Fields = new List<Field>
-                    {
-                        new Field("name", FieldType.String, false, true),
-                    },
-                };
+                await _typesense.DeleteCollection(TypesenseCollectionConfig.AliasName)
+                    .ConfigureAwait(false);
 
-                _logger.LogInformation(
-                    "Creating Typesense collection '{CollectionName}'.",
-                    TypesenseCollectionConfig.Name);
-
-                await _typesense.CreateCollection(schema).ConfigureAwait(false);
+                _logger.LogInformation("Migration: deleting previous collection.");
             }
+            catch (TypesenseApiNotFoundException)
+            {
+                // this is valid in case we have already migrated.
+            }
+        }
+
+        private async Task SetupCollection()
+        {
+            var schema = new Schema(
+                name: TypesenseCollectionConfig.CollectionName,
+                fields: new List<Field>
+                {
+                    new Field("name", FieldType.String, false, true),
+                });
+
+            _logger.LogInformation(
+                "Creating Typesense collection '{CollectionName}'.",
+                TypesenseCollectionConfig.CollectionName);
+
+            await _typesense.CreateCollection(schema).ConfigureAwait(false);
+        }
+
+        private async Task<IEnumerable<string>> RetrieveMatchingCollectionNames(string prefix)
+        {
+            return (await _typesense.RetrieveCollections().ConfigureAwait(false))
+                .Where(x => x.Name.StartsWith(prefix))
+                .Select(x => x.Name);
         }
 
         public override void Dispose()

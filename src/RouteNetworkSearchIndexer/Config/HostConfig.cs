@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +9,8 @@ using RouteNetworkSearchIndexer.RouteNetwork;
 using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Compact;
+using System;
+using System.Collections.Generic;
 using Typesense.Setup;
 
 namespace RouteNetworkSearchIndexer.Config
@@ -51,6 +51,30 @@ namespace RouteNetworkSearchIndexer.Config
 
         private static void ConfigureServices(IHostBuilder hostBuilder)
         {
+            var typesenseApi = Environment.GetEnvironmentVariable("TYPESENSE__APIKEY");
+            if (typesenseApi is null)
+            {
+                throw new Exception($"{nameof(typesenseApi)} cannot be null.");
+            }
+
+            var typesenseHost = Environment.GetEnvironmentVariable("TYPESENSE__HOST");
+            if (typesenseHost is null)
+            {
+                throw new Exception($"{nameof(typesenseHost)} cannot be null.");
+            }
+
+            var typesensePort = Environment.GetEnvironmentVariable("TYPESENSE__PORT");
+            if (typesensePort is null)
+            {
+                throw new Exception($"{nameof(typesensePort)} cannot be null.");
+            }
+
+            var typesenseProtocol = Environment.GetEnvironmentVariable("TYPESENSE__PROTOCOL");
+            if (typesenseProtocol is null)
+            {
+                throw new Exception($"{nameof(typesenseProtocol)} cannot be null.");
+            }
+
             hostBuilder.ConfigureServices((hostContext, services) =>
             {
                 services.AddOptions();
@@ -59,15 +83,13 @@ namespace RouteNetworkSearchIndexer.Config
                 services.AddTransient<IRouteNetworkConsumer, RouteNetworkConsumer>();
                 services.AddTypesenseClient(c =>
                 {
-                    c.ApiKey = Environment.GetEnvironmentVariable("TYPESENSE__APIKEY");
+                    c.ApiKey = typesenseApi;
                     c.Nodes = new List<Node>
                     {
-                        new Node
-                        {
-                            Host = Environment.GetEnvironmentVariable("TYPESENSE__HOST"),
-                            Port = Environment.GetEnvironmentVariable("TYPESENSE__PORT"),
-                            Protocol = Environment.GetEnvironmentVariable("TYPESENSE__PROTOCOL"),
-                        }
+                        new Node(
+                            host: typesenseHost,
+                            port: typesensePort,
+                            protocol: typesenseProtocol)
                     };
                 });
                 services.Configure<KafkaSetting>(s => hostContext.Configuration.GetSection("kafka").Bind(s));
