@@ -16,7 +16,6 @@
     <PackageReference Include="OpenFTTH.Events" Version="2.8.0" />
     <PackageReference Include="Topos" Version="0.1.4" />
     <PackageReference Include="Topos.Kafka" Version="0.1.4" />
-    <PackageReference Include="Topos.PostgreSql" Version="0.1.4" />
     <PackageReference Include="Typesense" Version="4.3.1" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="3.1.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="3.3.0" />
