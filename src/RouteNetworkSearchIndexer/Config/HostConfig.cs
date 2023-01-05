@@ -24,7 +24,7 @@ namespace RouteNetworkSearchIndexer.Config
             ConfigureApp(hostBuilder);
             ConfigureLogging(hostBuilder);
             ConfigureServices(hostBuilder);
-            ConfigureSerialization(hostBuilder);
+            ConfigureSerialization();
 
             return hostBuilder.Build();
         }
@@ -37,16 +37,16 @@ namespace RouteNetworkSearchIndexer.Config
             });
         }
 
-        private static void ConfigureSerialization(IHostBuilder hostBuilder)
+        private static void ConfigureSerialization()
         {
             JsonConvert.DefaultSettings = (() =>
-               {
-                   var settings = new JsonSerializerSettings();
-                   settings.ContractResolver = new CamelCasePropertyNamesContractResolver();
-                   settings.Converters.Add(new StringEnumConverter());
-                   settings.TypeNameHandling = TypeNameHandling.Auto;
-                   return settings;
-               });
+            {
+                var settings = new JsonSerializerSettings();
+                settings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+                settings.Converters.Add(new StringEnumConverter());
+                settings.TypeNameHandling = TypeNameHandling.Auto;
+                return settings;
+            });
         }
 
         private static void ConfigureServices(IHostBuilder hostBuilder)
