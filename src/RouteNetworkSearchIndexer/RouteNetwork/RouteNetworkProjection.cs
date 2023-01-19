@@ -1,30 +1,44 @@
-using MediatR;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
+using OpenFTTH.EventSourcing;
 using OpenFTTH.Events.Core;
 using OpenFTTH.Events.RouteNetwork;
 using RouteNetworkSearchIndexer.Config;
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Typesense;
 
 namespace RouteNetworkSearchIndexer.RouteNetwork;
 
-internal sealed class RouteNetworkEventHandler : IRequestHandler<RouteNetworkEditOperationOccuredEvent>
+internal sealed class RouteNetworkProjection : ProjectionBase
 {
-    private readonly ILogger<RouteNetworkEventHandler> _logger;
+    private readonly ILogger<RouteNetworkProjection> _logger;
     private readonly ITypesenseClient _typesense;
 
-    public RouteNetworkEventHandler(ILogger<RouteNetworkEventHandler> logger, ITypesenseClient typesense)
+    public RouteNetworkProjection(
+        ILogger<RouteNetworkProjection> logger,
+        ITypesenseClient typesense)
     {
         _logger = logger;
         _typesense = typesense;
+
+        ProjectEventAsync<RouteNetworkEditOperationOccuredEvent>(Project);
     }
 
-    public async Task<Unit> Handle(
-        RouteNetworkEditOperationOccuredEvent request,
-        CancellationToken cancellationToken)
+    public async Task Project(IEventEnvelope eventEnvelope)
+    {
+        switch (eventEnvelope.Data)
+        {
+            case (RouteNetworkEditOperationOccuredEvent @event):
+                await Handle(@event).ConfigureAwait(false);
+                break;
+            default:
+                throw new ArgumentException(
+                    $"Could not handle type {eventEnvelope.GetType()}");
+        }
+    }
+
+    public async Task Handle(
+        RouteNetworkEditOperationOccuredEvent request)
     {
         foreach (var command in request.RouteNetworkCommands)
         {
@@ -54,24 +68,24 @@ internal sealed class RouteNetworkEventHandler : IRequestHandler<RouteNetworkEdi
                 }
             }
         }
-
-        return await Unit.Task;
     }
 
     private async Task HandleRouteNodeAdded(RouteNodeAdded routeNodeAdded)
     {
-        if (!string.IsNullOrWhiteSpace(routeNodeAdded?.NamingInfo?.Name))
+        // If the route node does not have a name we do not want to index it.
+        if (string.IsNullOrWhiteSpace(routeNodeAdded?.NamingInfo?.Name))
         {
-            _logger.LogInformation($"{nameof(HandleRouteNodeAdded)}, NodeId: '{routeNodeAdded.NodeId}'");
-
-            var geometry = JsonConvert.DeserializeObject<string[]>(routeNodeAdded.Geometry);
-
-            await _typesense.CreateDocument<TypesenseRouteNode>(TypesenseCollectionConfig.CollectionName, new TypesenseRouteNode
-            {
-                Id = routeNodeAdded.NodeId.ToString(),
-                Name = routeNodeAdded.NamingInfo.Name.Trim(),
-            }).ConfigureAwait(false);
+            return;
         }
+
+        _logger.LogDebug($"{nameof(HandleRouteNodeAdded)}, NodeId: '{routeNodeAdded.NodeId}'");
+
+        var typesenseRouteNode = new TypesenseRouteNode(routeNodeAdded.NodeId.ToString(), routeNodeAdded.NamingInfo.Name.Trim());
+        await _typesense
+            .CreateDocument<TypesenseRouteNode>(
+                TypesenseCollectionConfig.CollectionName,
+                typesenseRouteNode)
+            .ConfigureAwait(false);
     }
 
     private async Task HandleRouteNodeMarkedForDeletion(RouteNodeMarkedForDeletion routeNodeMarkedForDeletion)
@@ -95,34 +109,42 @@ internal sealed class RouteNetworkEventHandler : IRequestHandler<RouteNetworkEdi
     private async Task HandleNamingInfoModified(NamingInfoModified namingInfoModified)
     {
         if (namingInfoModified.AggregateType.ToLower() != "routenode")
+        {
             return;
+        }
 
         if (!string.IsNullOrWhiteSpace(namingInfoModified.NamingInfo?.Name))
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 $"{nameof(HandleNamingInfoModified)}, NodeId: '{namingInfoModified.AggregateId}'");
-            await _typesense.UpsertDocument<TypesenseRouteNode>(TypesenseCollectionConfig.CollectionName, new TypesenseRouteNode
-            {
-                Id = namingInfoModified.AggregateId.ToString(),
-                Name = namingInfoModified.NamingInfo.Name.Trim(),
-            }).ConfigureAwait(false);
+
+            var typesenseRouteNode = new TypesenseRouteNode(
+                namingInfoModified.AggregateId.ToString(),
+                namingInfoModified.NamingInfo.Name.Trim());
+
+            await _typesense
+                .UpsertDocument<TypesenseRouteNode>(
+                    TypesenseCollectionConfig.CollectionName,
+                    typesenseRouteNode)
+                .ConfigureAwait(false);
         }
         else
         {
             try
             {
-                // we delete it because the name has been removed so it should no longer be searchable
-                // when name is empty
-                await _typesense.DeleteDocument<TypesenseRouteNode>(
-                    TypesenseCollectionConfig.CollectionName,
-                    namingInfoModified.AggregateId.ToString()).ConfigureAwait(false);
+                // Delete it because the name has been removed so it should no longer be searchable.
+                await _typesense
+                    .DeleteDocument<TypesenseRouteNode>(
+                        TypesenseCollectionConfig.CollectionName,
+                        namingInfoModified.AggregateId.ToString())
+                    .ConfigureAwait(false);
 
-                _logger.LogInformation(
+                _logger.LogDebug(
                     $"{nameof(HandleNamingInfoModified)}, NodeId: '{namingInfoModified.AggregateId}' deleted.");
             }
             catch (TypesenseApiNotFoundException)
             {
-                // This is valid.
+                // This can happen if it changes from empty name to empty name with whitespaces.
             }
         }
     }

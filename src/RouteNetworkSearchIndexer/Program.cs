@@ -1,5 +1,8 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using RouteNetworkSearchIndexer.Config;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -14,7 +17,19 @@ internal static class Program
         DotEnv.Load(dotenv);
 
         using var host = HostConfig.Configure();
-        await host.StartAsync().ConfigureAwait(false);
-        await host.WaitForShutdownAsync().ConfigureAwait(false);
+
+        var loggerFactory = host.Services.GetService<ILoggerFactory>();
+        var logger = loggerFactory!.CreateLogger(nameof(Program));
+
+        try
+        {
+            await host.StartAsync().ConfigureAwait(false);
+            await host.WaitForShutdownAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogCritical("{Exception}", ex);
+            throw;
+        }
     }
 }

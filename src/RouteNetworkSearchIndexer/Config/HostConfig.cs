@@ -1,10 +1,11 @@
-using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
+using OpenFTTH.EventSourcing;
+using OpenFTTH.EventSourcing.Postgres;
 using RouteNetworkSearchIndexer.RouteNetwork;
 using Serilog;
 using Serilog.Events;
@@ -54,45 +55,52 @@ internal static class HostConfig
         var typesenseApi = Environment.GetEnvironmentVariable("TYPESENSE__APIKEY");
         if (typesenseApi is null)
         {
-            throw new Exception($"{nameof(typesenseApi)} cannot be null.");
+            throw new ArgumentNullException($"{nameof(typesenseApi)} cannot be null.");
         }
 
         var typesenseHost = Environment.GetEnvironmentVariable("TYPESENSE__HOST");
         if (typesenseHost is null)
         {
-            throw new Exception($"{nameof(typesenseHost)} cannot be null.");
+            throw new ArgumentNullException($"{nameof(typesenseHost)} cannot be null.");
         }
 
         var typesensePort = Environment.GetEnvironmentVariable("TYPESENSE__PORT");
         if (typesensePort is null)
         {
-            throw new Exception($"{nameof(typesensePort)} cannot be null.");
+            throw new ArgumentNullException($"{nameof(typesensePort)} cannot be null.");
         }
 
         var typesenseProtocol = Environment.GetEnvironmentVariable("TYPESENSE__PROTOCOL");
         if (typesenseProtocol is null)
         {
-            throw new Exception($"{nameof(typesenseProtocol)} cannot be null.");
+            throw new ArgumentException($"{nameof(typesenseProtocol)} cannot be null.");
         }
 
         hostBuilder.ConfigureServices((hostContext, services) =>
         {
-            services.AddOptions();
-            services.AddMediatR(typeof(Program));
             services.AddHostedService<RouteNetworkSearchIndexerHost>();
-            services.AddTransient<IRouteNetworkConsumer, RouteNetworkConsumer>();
             services.AddTypesenseClient(c =>
             {
                 c.ApiKey = typesenseApi;
                 c.Nodes = new List<Node>
                 {
-                        new Node(
-                            host: typesenseHost,
-                            port: typesensePort,
-                            protocol: typesenseProtocol)
+                    new Node(
+                        host: typesenseHost,
+                        port: typesensePort,
+                        protocol: typesenseProtocol)
                 };
             });
-            services.Configure<KafkaSetting>(s => hostContext.Configuration.GetSection("kafka").Bind(s));
+
+            services.AddSingleton<IProjection, RouteNetworkProjection>();
+
+            services.AddSingleton<IEventStore>(
+                e =>
+                new PostgresEventStore(
+                    serviceProvider: e.GetRequiredService<IServiceProvider>(),
+                    connectionString: hostContext.Configuration.GetSection("EventStore").GetValue<string>("ConnectionString"),
+                    databaseSchemaName: "events"
+                )
+            );
         });
     }
 
