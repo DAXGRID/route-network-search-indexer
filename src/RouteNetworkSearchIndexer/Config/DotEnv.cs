@@ -1,27 +1,26 @@
 using System;
 using System.IO;
 
-namespace RouteNetworkSearchIndexer.Config
+namespace RouteNetworkSearchIndexer.Config;
+
+internal static class DotEnv
 {
-    public static class DotEnv
+    public static void Load(string filePath)
     {
-        public static void Load(string filePath)
+        if (!File.Exists(filePath))
+            return;
+
+        foreach (var line in File.ReadAllLines(filePath))
         {
-            if (!File.Exists(filePath))
-                return;
+            var parts = line.Split(
+                '=',
+                2,
+                StringSplitOptions.RemoveEmptyEntries);
 
-            foreach (var line in File.ReadAllLines(filePath))
-            {
-                var parts = line.Split(
-                    '=',
-                    2,
-                    StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2)
+                continue;
 
-                if (parts.Length != 2)
-                    continue;
-
-                Environment.SetEnvironmentVariable(parts[0], parts[1]);
-            }
+            Environment.SetEnvironmentVariable(parts[0], parts[1]);
         }
     }
 }

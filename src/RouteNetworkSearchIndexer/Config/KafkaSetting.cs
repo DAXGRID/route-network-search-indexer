@@ -1,10 +1,9 @@
-namespace RouteNetworkSearchIndexer.Config
+namespace RouteNetworkSearchIndexer.Config;
+
+internal sealed record KafkaSetting
 {
-    public class KafkaSetting
-    {
-        public string Consumer { get; set; }
-        public string Server { get; set; }
-        public string PositionConnectionString { get; set; }
-        public string Topic { get; set; }
-    }
+    public string Consumer { get; init; }
+    public string Server { get; init; }
+    public string PositionConnectionString { get; init; }
+    public string Topic { get; init; }
 }

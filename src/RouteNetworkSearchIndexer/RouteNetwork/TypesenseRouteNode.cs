@@ -1,12 +1,11 @@
 using Newtonsoft.Json;
 
-namespace RouteNetworkSearchIndexer.RouteNetwork
+namespace RouteNetworkSearchIndexer.RouteNetwork;
+
+internal sealed record TypesenseRouteNode
 {
-    public record TypesenseRouteNode
-    {
-        [JsonProperty("id")]
-        public string Id { get; set; }
-        [JsonProperty("name")]
-        public string Name { get; set; }
-    }
+    [JsonProperty("id")]
+    public string Id { get; init; }
+    [JsonProperty("name")]
+    public string Name { get; init; }
 }

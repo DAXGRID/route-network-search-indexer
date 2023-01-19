@@ -1,10 +1,9 @@
 using System;
 
-namespace RouteNetworkSearchIndexer.RouteNetwork
+namespace RouteNetworkSearchIndexer.RouteNetwork;
+
+internal interface IRouteNetworkConsumer : IDisposable
 {
-    public interface IRouteNetworkConsumer : IDisposable
-    {
-        void Consume();
-        DateTime? LastMessageReceived();
-    }
+    void Consume();
+    DateTime? LastMessageReceived();
 }
