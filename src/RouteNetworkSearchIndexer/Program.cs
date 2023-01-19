@@ -3,19 +3,18 @@ using RouteNetworkSearchIndexer.Config;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace RouteNetworkSearchIndexer
-{
-    public class Program
-    {
-        static async Task Main(string[] args)
-        {
-            var root = Directory.GetCurrentDirectory();
-            var dotenv = Path.Combine(root, ".env");
-            DotEnv.Load(dotenv);
+namespace RouteNetworkSearchIndexer;
 
-            using var host = HostConfig.Configure();
-            await host.StartAsync().ConfigureAwait(false);
-            await host.WaitForShutdownAsync().ConfigureAwait(false);
-        }
+internal static class Program
+{
+    static async Task Main(string[] args)
+    {
+        var root = Directory.GetCurrentDirectory();
+        var dotenv = Path.Combine(root, ".env");
+        DotEnv.Load(dotenv);
+
+        using var host = HostConfig.Configure();
+        await host.StartAsync().ConfigureAwait(false);
+        await host.WaitForShutdownAsync().ConfigureAwait(false);
     }
 }
