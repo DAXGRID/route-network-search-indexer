@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenFTTH.EventSourcing;
 using RouteNetworkSearchIndexer.Config;
-using RouteNetworkSearchIndexer.RouteNetwork;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -14,21 +14,19 @@ namespace RouteNetworkSearchIndexer;
 
 internal sealed class RouteNetworkSearchIndexerHost : BackgroundService
 {
+    private const int CATCHUP_INTERVAL_MS = 125;
     private readonly ILogger<RouteNetworkSearchIndexerHost> _logger;
-    private readonly IHostApplicationLifetime _applicationLifetime;
-    private readonly IRouteNetworkConsumer _routeNetworkConsumer;
     private readonly ITypesenseClient _typesense;
+    private readonly IEventStore _eventStore;
 
     public RouteNetworkSearchIndexerHost(
         ILogger<RouteNetworkSearchIndexerHost> logger,
-        IHostApplicationLifetime hostApplicationLifetime,
-        IRouteNetworkConsumer routeNetworkConsumer,
-        ITypesenseClient typesense)
+        ITypesenseClient typesense,
+        IEventStore eventStore)
     {
         _logger = logger;
-        _applicationLifetime = hostApplicationLifetime;
-        _routeNetworkConsumer = routeNetworkConsumer;
         _typesense = typesense;
+        _eventStore = eventStore;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -38,38 +36,35 @@ internal sealed class RouteNetworkSearchIndexerHost : BackgroundService
         // We migrate when first time run.
         await MigratePreviousCollection().ConfigureAwait(false);
 
+        _logger.LogInformation(
+            "Creating Typesense collection '{CollectionName}'.",
+            TypesenseCollectionConfig.CollectionName);
         await SetupCollection().ConfigureAwait(false);
 
-        _logger.LogInformation("Starting to consume RouteNodeEvents.");
-        _routeNetworkConsumer.Consume();
-
-        // This is a hack, it will be removed when solution is using event-store instead.
-        var lastReceivedTimeSec = 15;
-        while (true)
-        {
-            await Task.Delay(TimeSpan.FromSeconds(lastReceivedTimeSec), stoppingToken).ConfigureAwait(false);
-
-            var lastMessageReceived = _routeNetworkConsumer.LastMessageReceived();
-            if (lastMessageReceived is not null &&
-                lastMessageReceived.Value.AddSeconds(lastReceivedTimeSec) < DateTime.UtcNow)
-            {
-                break;
-            }
-        }
+        _logger.LogInformation("Starting initial dehydration of projections.");
+        await _eventStore.DehydrateProjectionsAsync(stoppingToken).ConfigureAwait(false);
+        _logger.LogInformation("Finished initial dehydration.");
 
         _logger.LogInformation(
             "Upserting {CollectionAlias} to {CollectionName}.",
             TypesenseCollectionConfig.AliasName,
             TypesenseCollectionConfig.CollectionName);
 
-        await _typesense.UpsertCollectionAlias(
-            TypesenseCollectionConfig.AliasName,
-            new CollectionAlias(TypesenseCollectionConfig.CollectionName)).ConfigureAwait(false);
+        await _typesense
+            .UpsertCollectionAlias(
+                TypesenseCollectionConfig.AliasName,
+                new CollectionAlias(TypesenseCollectionConfig.CollectionName))
+            .ConfigureAwait(false);
 
-        var collections = await RetrieveMatchingCollectionNames(
-            $"{TypesenseCollectionConfig.AliasName}-").ConfigureAwait(false);
+        var collections =
+            (await RetrieveMatchingCollectionNames(
+                $"{TypesenseCollectionConfig.AliasName}-")
+             .ConfigureAwait(false))
+            .Where(x => x != TypesenseCollectionConfig.CollectionName)
+            .ToList()
+            .AsReadOnly();
 
-        foreach (var collectionName in collections.Where(x => x != TypesenseCollectionConfig.CollectionName))
+        foreach (var collectionName in collections)
         {
             _logger.LogInformation("Deleting {Collection}.", collectionName);
             await _typesense.DeleteCollection(collectionName).ConfigureAwait(false);
@@ -77,6 +72,22 @@ internal sealed class RouteNetworkSearchIndexerHost : BackgroundService
 
         File.Create("/tmp/healthy");
         _logger.LogInformation("Marked as healthy.");
+
+        _logger.LogInformation("Starting listening for new events.");
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            await _eventStore.CatchUpAsync(stoppingToken).ConfigureAwait(false);
+            await Task.Delay(CATCHUP_INTERVAL_MS, stoppingToken).ConfigureAwait(false);
+        }
+    }
+
+    public override Task StopAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation(
+            "{HostName} stopped.",
+            nameof(RouteNetworkSearchIndexerHost));
+
+        return Task.CompletedTask;
     }
 
     private async Task MigratePreviousCollection()
@@ -103,10 +114,6 @@ internal sealed class RouteNetworkSearchIndexerHost : BackgroundService
                     new Field("name", FieldType.String, false, true),
             });
 
-        _logger.LogInformation(
-            "Creating Typesense collection '{CollectionName}'.",
-            TypesenseCollectionConfig.CollectionName);
-
         await _typesense.CreateCollection(schema).ConfigureAwait(false);
     }
 
@@ -115,13 +122,5 @@ internal sealed class RouteNetworkSearchIndexerHost : BackgroundService
         return (await _typesense.RetrieveCollections().ConfigureAwait(false))
             .Where(x => x.Name.StartsWith(prefix))
             .Select(x => x.Name);
-    }
-
-    public override void Dispose()
-    {
-        if (_routeNetworkConsumer is not null)
-            _routeNetworkConsumer.Dispose();
-
-        _logger.LogInformation("Stopped.");
     }
 }
