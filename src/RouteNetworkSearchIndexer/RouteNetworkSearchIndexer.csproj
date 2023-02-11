@@ -10,7 +10,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="OpenFTTH.Events" Version="3.2.0" />
-    <PackageReference Include="OpenFTTH.EventSourcing" Version="3.0.6" />
+    <PackageReference Include="OpenFTTH.EventSourcing" Version="3.0.8" />
     <PackageReference Include="Typesense" Version="4.3.1" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="3.1.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="3.4.0" />
