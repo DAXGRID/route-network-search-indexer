@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenFTTH.EventSourcing;
 using RouteNetworkSearchIndexer.Config;
 using System;
 using System.IO;
@@ -20,6 +21,8 @@ internal static class Program
 
         var loggerFactory = host.Services.GetService<ILoggerFactory>();
         var logger = loggerFactory!.CreateLogger(nameof(Program));
+
+        host.Services.GetService<IEventStore>()!.ScanForProjections();
 
         try
         {
