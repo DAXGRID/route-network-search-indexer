@@ -96,7 +96,7 @@ internal sealed class RouteNetworkProjection : ProjectionBase
                 TypesenseCollectionConfig.CollectionName,
                 routeNodeMarkedForDeletion.NodeId.ToString()).ConfigureAwait(false);
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 $"{nameof(HandleRouteNodeMarkedForDeletion)}, NodeId: '{routeNodeMarkedForDeletion.NodeId}'");
 
         }
