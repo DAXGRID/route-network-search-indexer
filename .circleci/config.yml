@@ -97,6 +97,7 @@ jobs:
              git add .
              git commit -m "upgrades $IMAGE_NAME to version $CIRCLE_TAG"
              git push
+
 workflows:
   build-test-upload_image:
     jobs:
