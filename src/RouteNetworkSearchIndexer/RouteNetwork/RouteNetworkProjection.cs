@@ -64,7 +64,7 @@ internal sealed class RouteNetworkProjection : ProjectionBase
                 }
                 catch (Exception e)
                 {
-                    _logger.LogError(e.Message);
+                    _logger.LogError("{Exception}", e);
                 }
             }
         }
