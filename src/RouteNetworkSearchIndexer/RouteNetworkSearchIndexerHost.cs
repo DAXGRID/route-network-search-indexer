@@ -2,7 +2,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenFTTH.EventSourcing;
 using RouteNetworkSearchIndexer.Config;
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
