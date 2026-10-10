@@ -17,5 +17,6 @@ WORKDIR /app
 
 RUN apk add --no-cache icu-libs krb5-libs
 
-COPY --from=build-env /app/src/RouteNetworkSearchIndexer/out .
+COPY --from=build-env --chown=app:app /app/src/RouteNetworkSearchIndexer/out .
+USER app
 ENTRYPOINT ["dotnet", "RouteNetworkSearchIndexer.dll"]
